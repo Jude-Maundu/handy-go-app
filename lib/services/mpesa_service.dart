@@ -1,0 +1,152 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../config/daraja_config.dart';
+
+enum MpesaStatus { pending, success, failed, timeout }
+
+class MpesaResult {
+  final MpesaStatus status;
+  final String? checkoutRequestId;
+  final String? message;
+  const MpesaResult({required this.status, this.checkoutRequestId, this.message});
+}
+
+class MpesaService {
+  // ── OAuth ──────────────────────────────────────────────────────────────────
+  static Future<String?> _getToken() async {
+    final creds = base64Encode(
+        utf8.encode('${DarajaConfig.consumerKey}:${DarajaConfig.consumerSecret}'));
+    final res = await http.get(
+      Uri.parse(
+          '${DarajaConfig.baseUrl}/oauth/v1/generate?grant_type=client_credentials'),
+      headers: {'Authorization': 'Basic $creds'},
+    );
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body)['access_token'] as String?;
+    }
+    return null;
+  }
+
+  // ── Build password (Base64 of shortcode + passkey + timestamp) ─────────────
+  static String _password(String timestamp) {
+    final raw =
+        '${DarajaConfig.shortCode}${DarajaConfig.passkey}$timestamp';
+    return base64Encode(utf8.encode(raw));
+  }
+
+  static String _timestamp() {
+    final now = DateTime.now();
+    return '${now.year}'
+        '${now.month.toString().padLeft(2, '0')}'
+        '${now.day.toString().padLeft(2, '0')}'
+        '${now.hour.toString().padLeft(2, '0')}'
+        '${now.minute.toString().padLeft(2, '0')}'
+        '${now.second.toString().padLeft(2, '0')}';
+  }
+
+  // ── STK Push ───────────────────────────────────────────────────────────────
+  /// Sends an M-Pesa STK push prompt to [phone] (format: 2547XXXXXXXX).
+  /// Returns a [MpesaResult] with a CheckoutRequestID on success.
+  static Future<MpesaResult> stkPush({
+    required String phone,
+    required int amount,
+    required String jobId,
+    required String description,
+  }) async {
+    final token = await _getToken();
+    if (token == null) {
+      return const MpesaResult(
+          status: MpesaStatus.failed, message: 'Could not authenticate with M-Pesa');
+    }
+
+    final ts = _timestamp();
+    final body = {
+      'BusinessShortCode': DarajaConfig.shortCode,
+      'Password': _password(ts),
+      'Timestamp': ts,
+      'TransactionType': 'CustomerPayBillOnline',
+      'Amount': amount,
+      'PartyA': phone,
+      'PartyB': DarajaConfig.shortCode,
+      'PhoneNumber': phone,
+      'CallBackURL': DarajaConfig.callbackUrl,
+      'AccountReference': 'HandyGo-$jobId',
+      'TransactionDesc': description,
+    };
+
+    final res = await http.post(
+      Uri.parse('${DarajaConfig.baseUrl}/mpesa/stkpush/v1/processrequest'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200 && data['ResponseCode'] == '0') {
+      return MpesaResult(
+        status: MpesaStatus.pending,
+        checkoutRequestId: data['CheckoutRequestID'] as String?,
+        message: data['CustomerMessage'] as String?,
+      );
+    }
+    return MpesaResult(
+      status: MpesaStatus.failed,
+      message: (data['errorMessage'] ?? data['ResponseDescription'] ?? 'STK push failed')
+          as String,
+    );
+  }
+
+  // ── STK Query (poll for completion) ───────────────────────────────────────
+  /// Polls Daraja every [intervalSecs] seconds (max [maxAttempts] times)
+  /// until the transaction is confirmed paid, failed, or times out.
+  static Future<MpesaStatus> pollStatus({
+    required String checkoutRequestId,
+    int intervalSecs = 5,
+    int maxAttempts = 12, // 60 seconds total
+  }) async {
+    for (int i = 0; i < maxAttempts; i++) {
+      await Future.delayed(Duration(seconds: intervalSecs));
+
+      final token = await _getToken();
+      if (token == null) continue;
+
+      final ts = _timestamp();
+      final body = {
+        'BusinessShortCode': DarajaConfig.shortCode,
+        'Password': _password(ts),
+        'Timestamp': ts,
+        'CheckoutRequestID': checkoutRequestId,
+      };
+
+      try {
+        final res = await http.post(
+          Uri.parse(
+              '${DarajaConfig.baseUrl}/mpesa/stkpushquery/v1/query'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(body),
+        );
+
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final resultCode = data['ResultCode']?.toString();
+
+        if (resultCode == '0') return MpesaStatus.success;
+        // 1032 = cancelled by user, 1037 = timeout, others = failed
+        if (resultCode != null && resultCode != '1032' && resultCode != '1037') {
+          return MpesaStatus.failed;
+        }
+        if (resultCode == '1032' || resultCode == '1037') {
+          return MpesaStatus.failed;
+        }
+      } catch (_) {
+        // Network error — keep polling
+      }
+    }
+    return MpesaStatus.timeout;
+  }
+}

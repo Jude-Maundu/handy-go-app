@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "598655007949",
+    "project_id": "handygo2",
+    "storage_bucket": "handygo2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:598655007949:android:b717220afccf40caf03d84",
+        "android_client_info": {
+          "package_name": "com.handygo.client"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBcYVt1tuDWYnO8M8PSW_jpD-rxy1cA-UU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:598655007949:android:3a61190003f34693f03d84",
+        "android_client_info": {
+          "package_name": "com.handygo.fundi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBcYVt1tuDWYnO8M8PSW_jpD-rxy1cA-UU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
