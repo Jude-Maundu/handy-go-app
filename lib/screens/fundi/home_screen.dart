@@ -29,7 +29,11 @@ class _FundiMainScreenState extends State<FundiMainScreen> {
   DateTime? _lastBackPress;
 
   late final List<Widget> _tabs = [
-    const _FundiHomeTab(),
+    _FundiHomeTab(onJobAccepted: () {
+      setState(() => _selectedIndex = 1);
+      final uid = context.read<AuthProvider>().currentUserId ?? '';
+      context.read<JobProvider>().fetchMyJobs(refresh: true, userId: uid);
+    }),
     const FundiJobsScreen(),
     const FundiPaymentsScreen(),
     const ProfileScreen(),
@@ -62,7 +66,13 @@ class _FundiMainScreenState extends State<FundiMainScreen> {
         body: IndexedStack(index: _selectedIndex, children: _tabs),
         bottomNavigationBar: NavigationBar(
           selectedIndex: _selectedIndex,
-          onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+          onDestinationSelected: (i) {
+            setState(() => _selectedIndex = i);
+            if (i == 1) {
+              final uid = context.read<AuthProvider>().currentUserId ?? '';
+              context.read<JobProvider>().fetchMyJobs(refresh: true, userId: uid);
+            }
+          },
           indicatorColor: color.withValues(alpha: 0.15),
           destinations: const [
             NavigationDestination(icon: Icon(Icons.explore_outlined), selectedIcon: Icon(Icons.explore), label: 'Discover'),
@@ -77,7 +87,8 @@ class _FundiMainScreenState extends State<FundiMainScreen> {
 }
 
 class _FundiHomeTab extends StatefulWidget {
-  const _FundiHomeTab();
+  final VoidCallback? onJobAccepted;
+  const _FundiHomeTab({this.onJobAccepted});
 
   @override
   State<_FundiHomeTab> createState() => _FundiHomeTabState();
@@ -158,7 +169,8 @@ class _FundiHomeTabState extends State<_FundiHomeTab> {
           jobTitle: job.title,
         );
       }
-      Navigator.push(context, MaterialPageRoute(builder: (_) => NavigateScreen(job: job)));
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => NavigateScreen(job: job)));
+      if (mounted) widget.onJobAccepted?.call();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Job was taken by another fundi'), backgroundColor: Colors.orange),

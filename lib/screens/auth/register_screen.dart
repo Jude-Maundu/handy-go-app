@@ -62,7 +62,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       skills: skills,
       primarySkill: skills.isNotEmpty ? skills.first : null,
     );
-    if (ok && mounted) Navigator.pop(context);
+    if (ok && mounted) {
+      final homeRoute =
+          FlavorConfig.instance.isClient ? '/client/home' : '/fundi/home';
+      Navigator.pushNamedAndRemoveUntil(context, homeRoute, (_) => false);
+    }
   }
 
   @override

@@ -7,6 +7,7 @@ import 'providers/auth_provider.dart';
 import 'providers/job_provider.dart';
 import 'providers/location_provider.dart';
 import 'providers/admin_provider.dart';
+import 'providers/theme_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/reset_password.dart';
@@ -35,17 +36,19 @@ class MyApp extends StatelessWidget {
 
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => LocationProvider()),
         ChangeNotifierProvider(create: (_) => JobProvider()),
         ChangeNotifierProvider(create: (_) => AdminProvider()),
       ],
-      child: MaterialApp(
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) => MaterialApp(
         title: config.appName,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme(config.primaryColor),
         darkTheme: AppTheme.darkTheme(config.primaryColor),
-        themeMode: ThemeMode.system,
+        themeMode: themeProvider.mode,
         home: const SplashScreen(),
         routes: {
           '/login': (_) => const LoginScreen(),
@@ -69,6 +72,7 @@ class MyApp extends StatelessWidget {
           // Admin (all tabs live inside AdminDashScreen)
           '/admin': (_) => const AdminDashScreen(),
         },
+      ),
       ),
     );
   }

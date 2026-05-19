@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/map_config.dart';
 import '../../constants/app_colors.dart';
 import '../../models/job_model.dart';
@@ -71,6 +72,24 @@ class _NavigateScreenState extends State<NavigateScreen> {
   void _recenter() {
     setState(() => _following = true);
     if (_myPos != null) _safeMoveMap(_myPos!, 16);
+  }
+
+  Future<void> _openInMaps() async {
+    final job = widget.job;
+    Uri uri;
+    if (_hasJobCoords) {
+      uri = Uri.parse(
+          'https://www.google.com/maps/dir/?api=1&destination=${_destPos.latitude},${_destPos.longitude}&travelmode=driving');
+    } else if (job != null) {
+      final encoded = Uri.encodeComponent(job.location);
+      uri = Uri.parse(
+          'https://www.google.com/maps/search/?api=1&query=$encoded');
+    } else {
+      return;
+    }
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   @override
@@ -322,24 +341,65 @@ class _NavigateScreenState extends State<NavigateScreen> {
                         ),
                       const SizedBox(height: 14),
 
-                      // Arrived button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.check_circle_outline, size: 20),
-                          label: const Text("I've Arrived",
-                              style: TextStyle(
-                                  fontSize: 15, fontWeight: FontWeight.w700)),
-                          onPressed: () => Navigator.pop(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: green,
-                            foregroundColor: Colors.white,
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14)),
+                      // No-coords notice
+                      if (!_hasJobCoords && widget.job != null)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline, color: Colors.orange, size: 16),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'No GPS pin — tap Open in Maps to navigate by address.',
+                                  style: TextStyle(color: Colors.orange, fontSize: 12),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+
+                      // Open in Maps + Arrived buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.map_outlined, size: 18),
+                              label: const Text('Open in Maps',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              onPressed: _openInMaps,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: green,
+                                side: BorderSide(color: green),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.check_circle_outline, size: 18),
+                              label: const Text("Arrived",
+                                  style: TextStyle(
+                                      fontSize: 14, fontWeight: FontWeight.w700)),
+                              onPressed: () => Navigator.pop(context),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14)),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

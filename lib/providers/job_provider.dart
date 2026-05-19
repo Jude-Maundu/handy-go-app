@@ -153,12 +153,13 @@ class JobProvider extends ChangeNotifier {
       final field = BuildConfig.isClient ? 'clientId' : 'fundiId';
       final snap = await _col
           .where(field, isEqualTo: userId)
-          .orderBy('createdAt', descending: true)
           .limit(50)
           .get();
+      final jobs = snap.docs.map((d) => Job.fromFirestore(d)).toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       _myJobsList
         ..clear()
-        ..addAll(snap.docs.map((d) => Job.fromFirestore(d)));
+        ..addAll(jobs);
       return true;
     } catch (e) {
       _jobsError = 'Error fetching my jobs: $e';
@@ -393,11 +394,12 @@ class JobProvider extends ChangeNotifier {
       final snap = await _col
           .where('clientId', isEqualTo: userId)
           .where('status', isEqualTo: 'completed')
-          .orderBy('createdAt', descending: true)
           .get();
+      final jobs = snap.docs.map((d) => Job.fromFirestore(d)).toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       _paymentList
         ..clear()
-        ..addAll(snap.docs.map((d) => Job.fromFirestore(d)));
+        ..addAll(jobs);
       return true;
     } catch (e) {
       _jobsError = 'Error fetching payments: $e';
@@ -416,11 +418,12 @@ class JobProvider extends ChangeNotifier {
       final snap = await _col
           .where('fundiId', isEqualTo: userId)
           .where('status', isEqualTo: 'completed')
-          .orderBy('createdAt', descending: true)
           .get();
+      final jobs = snap.docs.map((d) => Job.fromFirestore(d)).toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       _paymentList
         ..clear()
-        ..addAll(snap.docs.map((d) => Job.fromFirestore(d)));
+        ..addAll(jobs);
       return true;
     } catch (e) {
       _jobsError = 'Error fetching earnings: $e';
