@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
+import '../../config/map_config.dart';
 import '../../config/flavor_config.dart';
 import '../../providers/job_provider.dart';
 import '../../models/job_model.dart';
@@ -66,12 +67,7 @@ class _OrderView extends StatelessWidget {
           FlutterMap(
             options: MapOptions(initialCenter: center, initialZoom: 15),
             children: [
-              TileLayer(
-                urlTemplate: AC.mapTileUrl(context),
-                subdomains: AC.mapSubdomains(context),
-                retinaMode: RetinaMode.isHighDensity(context),
-                userAgentPackageName: 'com.handygo.client',
-              ),
+              ...MapConfig.tileLayers(dark: Theme.of(context).brightness == Brightness.dark),
               MarkerLayer(markers: [
                 Marker(
                   point: center,

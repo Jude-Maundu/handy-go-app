@@ -10,6 +10,7 @@ import '../../providers/job_provider.dart';
 import '../../providers/location_provider.dart';
 import 'job_searching_screen.dart';
 import '../../services/notification_service.dart';
+import '../../services/tomtom_service.dart';
 
 class RequestFundiScreen extends StatefulWidget {
   const RequestFundiScreen({super.key});
@@ -107,6 +108,14 @@ class _RequestFundiScreenState extends State<RequestFundiScreen> {
       }
     }
 
+    // Geocode typed address so fundis get GPS coords for navigation
+    double? lat = _useCurrentLocation ? location.latitude : null;
+    double? lng = _useCurrentLocation ? location.longitude : null;
+    if (!_useCurrentLocation && loc.isNotEmpty) {
+      final coords = await TomTomService.geocode(loc);
+      if (coords != null) { lat = coords.latitude; lng = coords.longitude; }
+    }
+
     final ok = await jobs.createJob(
       title: _titleController.text.trim(),
       category: _selectedCategory,
@@ -115,8 +124,8 @@ class _RequestFundiScreenState extends State<RequestFundiScreen> {
       location: loc,
       clientId: uid,
       clientName: auth.userName ?? 'Client',
-      latitude: _useCurrentLocation ? location.latitude : null,
-      longitude: _useCurrentLocation ? location.longitude : null,
+      latitude: lat,
+      longitude: lng,
       photoUrls: photoUrls,
     );
 

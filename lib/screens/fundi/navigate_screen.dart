@@ -8,6 +8,7 @@ import '../../config/map_config.dart';
 import '../../constants/app_colors.dart';
 import '../../models/job_model.dart';
 import '../../providers/location_provider.dart';
+import '../../services/tomtom_service.dart';
 
 class NavigateScreen extends StatefulWidget {
   final Job? job;
@@ -21,6 +22,8 @@ class _NavigateScreenState extends State<NavigateScreen> {
   final _mapController = MapController();
   LatLng? _myPos;
   bool _following = true;
+  List<LatLng> _routePoints = [];
+  bool _routeLoading = false;
 
   bool get _hasJobCoords =>
       widget.job?.latitude != null && widget.job?.longitude != null;
@@ -43,13 +46,20 @@ class _NavigateScreenState extends State<NavigateScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final loc = context.read<LocationProvider>();
-      // Seed current position before streaming starts
       if (loc.hasLocation) {
         _myPos = LatLng(loc.latitude!, loc.longitude!);
+        if (_hasJobCoords) _fetchRoute(_myPos!);
       }
       loc.addListener(_onLocationUpdate);
       loc.startTracking();
     });
+  }
+
+  Future<void> _fetchRoute(LatLng origin) async {
+    if (!_hasJobCoords) return;
+    setState(() => _routeLoading = true);
+    final points = await TomTomService.getRoute(origin, _destPos);
+    if (mounted) setState(() { _routePoints = points; _routeLoading = false; });
   }
 
   void _onLocationUpdate() {
@@ -129,21 +139,30 @@ class _NavigateScreenState extends State<NavigateScreen> {
               },
             ),
             children: [
-              TileLayer(
-                urlTemplate: MapConfig.tileUrl(dark: true),
-                subdomains: MapConfig.subdomains,
-                retinaMode: RetinaMode.isHighDensity(context),
-                userAgentPackageName: 'com.handygo.fundi',
-              ),
+              ...MapConfig.tileLayers(dark: true),
 
-              // Route polyline
-              if (_myPos != null && _hasJobCoords)
+              // Real road route from TomTom
+              if (_routePoints.length > 1)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: _routePoints,
+                      color: green,
+                      strokeWidth: 6,
+                      borderColor: Colors.black26,
+                      borderStrokeWidth: 2,
+                    ),
+                  ],
+                )
+              // Fallback straight line while route loads
+              else if (_myPos != null && _hasJobCoords)
                 PolylineLayer(
                   polylines: [
                     Polyline(
                       points: [_myPos!, _destPos],
-                      color: green.withValues(alpha: 0.85),
-                      strokeWidth: 5,
+                      color: green.withValues(alpha: 0.4),
+                      strokeWidth: 3,
+                      isDotted: true,
                     ),
                   ],
                 ),
@@ -199,6 +218,22 @@ class _NavigateScreenState extends State<NavigateScreen> {
                     context,
                   ),
                   const Spacer(),
+                  if (_routeLoading)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AC.surface(context).withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: green)),
+                          const SizedBox(width: 8),
+                          Text('Finding route…', style: TextStyle(color: AC.text(context), fontSize: 12)),
+                        ],
+                      ),
+                    ),
                   if (!_following)
                     _iconBtn(
                       Icons.my_location,

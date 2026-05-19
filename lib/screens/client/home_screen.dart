@@ -8,6 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/job_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../config/flavor_config.dart';
+import '../../config/map_config.dart';
 import '../../services/notification_service.dart';
 import '../../models/job_model.dart';
 import 'bookings_screen.dart';
@@ -157,12 +158,7 @@ class _ClientHomeTabState extends State<_ClientHomeTab> {
             mapController: _mapController,
             options: MapOptions(initialCenter: center, initialZoom: 15),
             children: [
-              TileLayer(
-                urlTemplate: AC.mapTileUrl(context),
-                subdomains: AC.mapSubdomains(context),
-                retinaMode: RetinaMode.isHighDensity(context),
-                userAgentPackageName: 'com.handygo.client',
-              ),
+              ...MapConfig.tileLayers(dark: Theme.of(context).brightness == Brightness.dark),
               if (location.hasLocation)
                 MarkerLayer(markers: [
                   Marker(

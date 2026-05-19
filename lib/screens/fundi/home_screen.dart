@@ -9,6 +9,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/job_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../config/flavor_config.dart';
+import '../../config/map_config.dart';
 import '../../models/job_model.dart';
 import 'job_screen.dart';
 import 'navigate_screen.dart';
@@ -196,12 +197,7 @@ class _FundiHomeTabState extends State<_FundiHomeTab> {
             mapController: _mapController,
             options: MapOptions(initialCenter: center, initialZoom: 15),
             children: [
-              TileLayer(
-                urlTemplate: AC.mapTileUrl(context),
-                subdomains: AC.mapSubdomains(context),
-                retinaMode: RetinaMode.isHighDensity(context),
-                userAgentPackageName: 'com.handygo.fundi',
-              ),
+              ...MapConfig.tileLayers(dark: Theme.of(context).brightness == Brightness.dark),
               if (location.hasLocation)
                 MarkerLayer(markers: [
                   Marker(
