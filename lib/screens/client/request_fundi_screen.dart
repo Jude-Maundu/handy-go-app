@@ -11,6 +11,7 @@ import '../../providers/location_provider.dart';
 import 'job_searching_screen.dart';
 import '../../services/notification_service.dart';
 import '../../services/tomtom_service.dart';
+import '../../services/validators.dart';
 
 class RequestFundiScreen extends StatefulWidget {
   const RequestFundiScreen({super.key});
@@ -124,6 +125,7 @@ class _RequestFundiScreenState extends State<RequestFundiScreen> {
       location: loc,
       clientId: uid,
       clientName: auth.userName ?? 'Client',
+      clientPhone: auth.phone,
       latitude: lat,
       longitude: lng,
       photoUrls: photoUrls,
@@ -261,7 +263,7 @@ class _RequestFundiScreenState extends State<RequestFundiScreen> {
                 controller: _titleController,
                 style: TextStyle(color: AC.text(context)),
                 decoration: _inputDec('e.g. Fix leaking kitchen pipe', accent),
-                validator: (v) => (v == null || v.trim().length < 3) ? 'Enter a descriptive title' : null,
+                validator: Validators.jobTitle,
               ),
               const SizedBox(height: 16),
 
@@ -273,7 +275,7 @@ class _RequestFundiScreenState extends State<RequestFundiScreen> {
                 maxLines: 4,
                 style: TextStyle(color: AC.text(context)),
                 decoration: _inputDec('Describe the problem in detail...', accent),
-                validator: (v) => (v == null || v.trim().length < 10) ? 'Please describe the job' : null,
+                validator: Validators.jobDescription,
               ),
               const SizedBox(height: 16),
 
@@ -350,10 +352,7 @@ class _RequestFundiScreenState extends State<RequestFundiScreen> {
                 enabled: !_useCurrentLocation,
                 style: TextStyle(color: AC.text(context)),
                 decoration: _inputDec('Enter your address', accent),
-                validator: (v) {
-                  if (_useCurrentLocation) return null;
-                  return (v == null || v.trim().isEmpty) ? 'Enter a location' : null;
-                },
+                validator: _useCurrentLocation ? null : Validators.location,
               ),
               const SizedBox(height: 10),
               GestureDetector(
@@ -397,11 +396,7 @@ class _RequestFundiScreenState extends State<RequestFundiScreen> {
                   prefixText: 'KES ',
                   prefixStyle: TextStyle(color: accent, fontWeight: FontWeight.w600),
                 ),
-                validator: (v) {
-                  final n = double.tryParse(v ?? '');
-                  if (n == null || n <= 0) return 'Enter a valid budget';
-                  return null;
-                },
+                validator: Validators.budget,
               ),
               const SizedBox(height: 32),
 

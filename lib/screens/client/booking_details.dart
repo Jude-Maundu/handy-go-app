@@ -9,6 +9,7 @@ import '../../providers/job_provider.dart';
 import '../../models/job_model.dart';
 import 'track_fundi_screen.dart';
 import 'rate_fundi.dart';
+import '../sharedscreens/report_screen.dart';
 
 class BookingDetailsScreen extends StatefulWidget {
   final String jobId;
@@ -182,9 +183,26 @@ class _OrderView extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _ActionIcon(icon: Icons.phone_android, label: 'M-Pesa'),
-                      _ActionIcon(icon: Icons.chat_bubble_outline, label: 'Comment'),
-                      _ActionIcon(icon: Icons.grid_view, label: 'Services'),
+                      const _ActionIcon(icon: Icons.phone_android, label: 'M-Pesa'),
+                      const _ActionIcon(icon: Icons.chat_bubble_outline, label: 'Chat'),
+                      if (job.fundiId != null)
+                        _ActionIcon(
+                          icon: Icons.flag_outlined,
+                          label: 'Report',
+                          color: Colors.red,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ReportScreen(
+                                jobId: job.id,
+                                reportedUserId: job.fundiId!,
+                                reportedUserName: job.fundiName ?? 'Fundi',
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        const _ActionIcon(icon: Icons.grid_view, label: 'Services'),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -250,20 +268,29 @@ class _OrderView extends StatelessWidget {
 class _ActionIcon extends StatelessWidget {
   final IconData icon;
   final String label;
-  const _ActionIcon({required this.icon, required this.label});
+  final Color? color;
+  final VoidCallback? onTap;
+  const _ActionIcon({required this.icon, required this.label, this.color, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 44, height: 44,
-          decoration: BoxDecoration(color: AC.input(context), borderRadius: BorderRadius.circular(12)),
-          child: Icon(icon, color: AppColors.textSecondary, size: 20),
-        ),
-        const SizedBox(height: 4),
-        Text(label, style: TextStyle(color: AC.textSec(context), fontSize: 11)),
-      ],
+    final iconColor = color ?? AppColors.textSecondary;
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(
+              color: color != null ? color!.withValues(alpha: 0.1) : AC.input(context),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          const SizedBox(height: 4),
+          Text(label, style: TextStyle(color: color ?? AC.textSec(context), fontSize: 11)),
+        ],
+      ),
     );
   }
 }

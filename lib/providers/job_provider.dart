@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../config/build_config.dart';
@@ -37,12 +38,37 @@ class JobProvider extends ChangeNotifier {
   // ── Real-time streams ──────────────────────────────────────────────────────
 
   /// Live feed of pending jobs for fundis (Uber-style request queue).
-  Stream<List<Job>> streamPendingJobs() {
+  /// Pass [fundiLat]/[fundiLng] to sort by proximity (closest first).
+  Stream<List<Job>> streamPendingJobs({double? fundiLat, double? fundiLng}) {
     return _col.where('status', isEqualTo: 'pending').snapshots().map((snap) {
-      final jobs = snap.docs.map((d) => Job.fromFirestore(d)).toList();
-      jobs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      final jobs = snap.docs
+          .map((d) => Job.fromFirestore(d))
+          .where((j) => j.status == JobStatus.pending)
+          .toList();
+
+      if (fundiLat != null && fundiLng != null) {
+        jobs.sort((a, b) {
+          final dA = _haversine(fundiLat, fundiLng,
+              a.latitude ?? -1.2864, a.longitude ?? 36.8172);
+          final dB = _haversine(fundiLat, fundiLng,
+              b.latitude ?? -1.2864, b.longitude ?? 36.8172);
+          return dA.compareTo(dB);
+        });
+      } else {
+        jobs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      }
       return jobs;
     });
+  }
+
+  double _haversine(double lat1, double lng1, double lat2, double lng2) {
+    const r = 6371.0;
+    final dLat = (lat2 - lat1) * pi / 180;
+    final dLng = (lng2 - lng1) * pi / 180;
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1 * pi / 180) * cos(lat2 * pi / 180) *
+            sin(dLng / 2) * sin(dLng / 2);
+    return r * 2 * atan2(sqrt(a), sqrt(1 - a));
   }
 
   /// Live stream of a single job document (client uses this to wait for match).
@@ -238,6 +264,7 @@ class JobProvider extends ChangeNotifier {
     required String location,
     required String clientId,
     required String clientName,
+    String? clientPhone,
     double? latitude,
     double? longitude,
     List<String> photoUrls = const [],
@@ -268,6 +295,7 @@ class JobProvider extends ChangeNotifier {
         'status': 'pending',
         'applicantsCount': 0,
         'createdAt': now,
+        if (clientPhone != null && clientPhone.isNotEmpty) 'clientPhone': clientPhone,
         if (latitude != null) 'latitude': latitude,
         if (longitude != null) 'longitude': longitude,
         if (photoUrls.isNotEmpty) 'photoUrls': photoUrls,
@@ -548,6 +576,35 @@ class JobProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       debugPrint('Rating error: $e');
+      return false;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Reporting
+  // ──────────────────────────────────────────────────────────────────────────
+
+  Future<bool> submitReport({
+    required String jobId,
+    required String reporterId,
+    required String reportedUserId,
+    required String reportedUserName,
+    required String reason,
+    String? details,
+  }) async {
+    try {
+      await _db.collection('reports').add({
+        'jobId': jobId,
+        'reporterId': reporterId,
+        'reportedUserId': reportedUserId,
+        'reportedUserName': reportedUserName,
+        'reason': reason,
+        if (details != null && details.isNotEmpty) 'details': details,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (_) {
       return false;
     }
   }

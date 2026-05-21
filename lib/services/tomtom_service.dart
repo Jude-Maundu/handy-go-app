@@ -1,10 +1,9 @@
 import 'dart:convert';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 class TomTomService {
-  static String get _key => dotenv.env['TOMTOM_KEY'] ?? '';
+  static const String _key = 'sEQDj4OdM1V5fJQQ5aNkkBwSoGfhoneh';
 
   /// Returns road-following route points between two coordinates.
   static Future<List<LatLng>> getRoute(LatLng origin, LatLng dest) async {

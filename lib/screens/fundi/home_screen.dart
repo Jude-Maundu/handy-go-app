@@ -17,6 +17,7 @@ import '../sharedscreens/profile_screen.dart';
 import '../sharedscreens/app_drawer.dart';
 import 'fundi_payments_screen.dart';
 import '../../services/notification_service.dart';
+import '../../providers/fundi_provider.dart';
 
 class FundiMainScreen extends StatefulWidget {
   const FundiMainScreen({super.key});
@@ -252,9 +253,18 @@ class _FundiHomeTabState extends State<_FundiHomeTab> {
                   const SizedBox(width: 12),
                   // Online/offline pill
                   GestureDetector(
-                    onTap: () {
+                    onTap: () async {
                       setState(() => _isOnline = !_isOnline);
-                      if (_isOnline) context.read<LocationProvider>().getCurrentLocation();
+                      if (_isOnline) {
+                        final locProvider = context.read<LocationProvider>();
+                        final fundiProvider = context.read<FundiProvider>();
+                        final uid = context.read<AuthProvider>().currentUserId;
+                        await locProvider.getCurrentLocation();
+                        if (uid != null && locProvider.hasLocation) {
+                          fundiProvider.updateFundiLocation(
+                              uid, locProvider.latitude!, locProvider.longitude!);
+                        }
+                      }
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 250),
@@ -318,7 +328,10 @@ class _FundiHomeTabState extends State<_FundiHomeTab> {
           // Live job request card (bottom)
           if (_isOnline)
             StreamBuilder<List<Job>>(
-              stream: context.read<JobProvider>().streamPendingJobs(),
+              stream: context.read<JobProvider>().streamPendingJobs(
+                    fundiLat: location.latitude,
+                    fundiLng: location.longitude,
+                  ),
               builder: (context, snap) {
                 final jobs = snap.data ?? [];
                 if (jobs.isEmpty) {

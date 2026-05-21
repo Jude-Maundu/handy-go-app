@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/daraja_config.dart';
 
-enum MpesaStatus { pending, success, failed, timeout }
+enum MpesaStatus { pending, success, cancelled, failed, timeout }
 
 class MpesaResult {
   final MpesaStatus status;
@@ -99,53 +99,51 @@ class MpesaService {
     );
   }
 
-  // ── STK Query (poll for completion) ───────────────────────────────────────
-  /// Polls Daraja every [intervalSecs] seconds (max [maxAttempts] times)
-  /// until the transaction is confirmed paid, failed, or times out.
+  // ── Single STK query (one attempt) ────────────────────────────────────────
+  /// Returns [pending] if the transaction is still processing,
+  /// [success], [cancelled], or [failed] when it resolves.
+  static Future<MpesaStatus> queryOnce(String checkoutRequestId) async {
+    final token = await _getToken();
+    if (token == null) return MpesaStatus.pending;
+
+    final ts = _timestamp();
+    final body = {
+      'BusinessShortCode': DarajaConfig.shortCode,
+      'Password': _password(ts),
+      'Timestamp': ts,
+      'CheckoutRequestID': checkoutRequestId,
+    };
+
+    try {
+      final res = await http.post(
+        Uri.parse('${DarajaConfig.baseUrl}/mpesa/stkpushquery/v1/query'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final resultCode = data['ResultCode']?.toString();
+
+      if (resultCode == '0') return MpesaStatus.success;
+      if (resultCode == '1032') return MpesaStatus.cancelled; // user cancelled
+      if (resultCode != null) return MpesaStatus.failed; // any other code = failed
+    } catch (_) {}
+    return MpesaStatus.pending; // network error or still processing
+  }
+
+  // ── STK Query (poll for completion) — kept for backward compat ────────────
   static Future<MpesaStatus> pollStatus({
     required String checkoutRequestId,
     int intervalSecs = 5,
-    int maxAttempts = 12, // 60 seconds total
+    int maxAttempts = 12,
   }) async {
     for (int i = 0; i < maxAttempts; i++) {
       await Future.delayed(Duration(seconds: intervalSecs));
-
-      final token = await _getToken();
-      if (token == null) continue;
-
-      final ts = _timestamp();
-      final body = {
-        'BusinessShortCode': DarajaConfig.shortCode,
-        'Password': _password(ts),
-        'Timestamp': ts,
-        'CheckoutRequestID': checkoutRequestId,
-      };
-
-      try {
-        final res = await http.post(
-          Uri.parse(
-              '${DarajaConfig.baseUrl}/mpesa/stkpushquery/v1/query'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode(body),
-        );
-
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final resultCode = data['ResultCode']?.toString();
-
-        if (resultCode == '0') return MpesaStatus.success;
-        // 1032 = cancelled by user, 1037 = timeout, others = failed
-        if (resultCode != null && resultCode != '1032' && resultCode != '1037') {
-          return MpesaStatus.failed;
-        }
-        if (resultCode == '1032' || resultCode == '1037') {
-          return MpesaStatus.failed;
-        }
-      } catch (_) {
-        // Network error — keep polling
-      }
+      final status = await queryOnce(checkoutRequestId);
+      if (status != MpesaStatus.pending) return status;
     }
     return MpesaStatus.timeout;
   }

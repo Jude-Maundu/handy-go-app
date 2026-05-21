@@ -8,6 +8,14 @@ import 'providers/job_provider.dart';
 import 'providers/location_provider.dart';
 import 'providers/admin_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/fundi_provider.dart';
+import 'providers/notification_provider.dart';
+import 'providers/earnings_provider.dart';
+import 'providers/payment_provider.dart';
+import 'providers/booking_provider.dart';
+import 'providers/category_provider.dart';
+import 'providers/chat_provider.dart';
+import 'providers/settings_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/reset_password.dart';
@@ -41,6 +49,14 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LocationProvider()),
         ChangeNotifierProvider(create: (_) => JobProvider()),
         ChangeNotifierProvider(create: (_) => AdminProvider()),
+        ChangeNotifierProvider(create: (_) => FundiProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => EarningsProvider()),
+        ChangeNotifierProvider(create: (_) => PaymentProvider()),
+        ChangeNotifierProvider(create: (_) => BookingProvider()),
+        ChangeNotifierProvider(create: (_) => CategoryProvider()),
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) => MaterialApp(

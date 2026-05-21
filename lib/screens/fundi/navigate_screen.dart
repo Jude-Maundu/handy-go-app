@@ -9,6 +9,7 @@ import '../../constants/app_colors.dart';
 import '../../models/job_model.dart';
 import '../../providers/location_provider.dart';
 import '../../services/tomtom_service.dart';
+import 'work_summary_screen.dart';
 
 class NavigateScreen extends StatefulWidget {
   final Job? job;
@@ -24,16 +25,24 @@ class _NavigateScreenState extends State<NavigateScreen> {
   bool _following = true;
   List<LatLng> _routePoints = [];
   bool _routeLoading = false;
+  LatLng? _geocodedDest; // fallback when job has no coordinates
 
+  // True when job has actual lat/lng fields
   bool get _hasJobCoords =>
       widget.job?.latitude != null && widget.job?.longitude != null;
 
-  LatLng get _destPos => _hasJobCoords
-      ? LatLng(widget.job!.latitude!, widget.job!.longitude!)
-      : const LatLng(-1.286389, 36.817223);
+  // True when we have any valid destination (job coords OR geocoded)
+  bool get _hasValidDest => _hasJobCoords || _geocodedDest != null;
+
+  LatLng get _destPos {
+    if (_hasJobCoords) {
+      return LatLng(widget.job!.latitude!, widget.job!.longitude!);
+    }
+    return _geocodedDest ?? const LatLng(-1.286389, 36.817223);
+  }
 
   double get _distanceKm {
-    if (_myPos == null || !_hasJobCoords) return 0;
+    if (_myPos == null || !_hasValidDest) return 0;
     return Geolocator.distanceBetween(
           _myPos!.latitude, _myPos!.longitude,
           _destPos.latitude, _destPos.longitude,
@@ -48,7 +57,11 @@ class _NavigateScreenState extends State<NavigateScreen> {
       final loc = context.read<LocationProvider>();
       if (loc.hasLocation) {
         _myPos = LatLng(loc.latitude!, loc.longitude!);
-        if (_hasJobCoords) _fetchRoute(_myPos!);
+        if (_hasJobCoords) {
+          _fetchRoute(_myPos!);
+        } else if (widget.job?.location.isNotEmpty == true) {
+          _geocodeAndRoute(_myPos!);
+        }
       }
       loc.addListener(_onLocationUpdate);
       loc.startTracking();
@@ -56,10 +69,24 @@ class _NavigateScreenState extends State<NavigateScreen> {
   }
 
   Future<void> _fetchRoute(LatLng origin) async {
-    if (!_hasJobCoords) return;
+    if (!_hasValidDest) return;
     setState(() => _routeLoading = true);
     final points = await TomTomService.getRoute(origin, _destPos);
     if (mounted) setState(() { _routePoints = points; _routeLoading = false; });
+  }
+
+  // Geocode the job's text location, then fetch route
+  Future<void> _geocodeAndRoute(LatLng origin) async {
+    setState(() => _routeLoading = true);
+    final coords = await TomTomService.geocode(widget.job!.location);
+    if (!mounted) return;
+    if (coords != null) {
+      setState(() => _geocodedDest = coords);
+      final points = await TomTomService.getRoute(origin, coords);
+      if (mounted) setState(() { _routePoints = points; _routeLoading = false; });
+    } else {
+      if (mounted) setState(() => _routeLoading = false);
+    }
   }
 
   void _onLocationUpdate() {
@@ -87,7 +114,7 @@ class _NavigateScreenState extends State<NavigateScreen> {
   Future<void> _openInMaps() async {
     final job = widget.job;
     Uri uri;
-    if (_hasJobCoords) {
+    if (_hasValidDest) {
       uri = Uri.parse(
           'https://www.google.com/maps/dir/?api=1&destination=${_destPos.latitude},${_destPos.longitude}&travelmode=driving');
     } else if (job != null) {
@@ -102,6 +129,18 @@ class _NavigateScreenState extends State<NavigateScreen> {
     }
   }
 
+  void _onArrived() {
+    final job = widget.job;
+    if (job != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => WorkSummaryScreen(job: job)),
+      );
+    } else {
+      Navigator.pop(context);
+    }
+  }
+
   @override
   void dispose() {
     context.read<LocationProvider>()
@@ -113,7 +152,7 @@ class _NavigateScreenState extends State<NavigateScreen> {
   @override
   Widget build(BuildContext context) {
     final job = widget.job;
-    final green = const Color(0xFF4CAF50);
+    const green = Color(0xFF4CAF50);
     final mapCenter = _myPos ?? _destPos;
     final dist = _distanceKm;
     final eta = dist > 0
@@ -131,7 +170,6 @@ class _NavigateScreenState extends State<NavigateScreen> {
               initialCenter: mapCenter,
               initialZoom: 16,
               onMapEvent: (event) {
-                // Detect manual drag: disable auto-follow
                 if (event is MapEventMoveStart &&
                     event.source == MapEventSource.dragStart) {
                   if (_following) setState(() => _following = false);
@@ -155,7 +193,7 @@ class _NavigateScreenState extends State<NavigateScreen> {
                   ],
                 )
               // Fallback straight line while route loads
-              else if (_myPos != null && _hasJobCoords)
+              else if (_myPos != null && _hasValidDest)
                 PolylineLayer(
                   polylines: [
                     Polyline(
@@ -171,7 +209,7 @@ class _NavigateScreenState extends State<NavigateScreen> {
               MarkerLayer(
                 markers: [
                   // Destination pin
-                  if (_hasJobCoords)
+                  if (_hasValidDest)
                     Marker(
                       point: _destPos,
                       width: 48,
@@ -228,7 +266,7 @@ class _NavigateScreenState extends State<NavigateScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: green)),
+                          const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: green)),
                           const SizedBox(width: 8),
                           Text('Finding route…', style: TextStyle(color: AC.text(context), fontSize: 12)),
                         ],
@@ -247,7 +285,7 @@ class _NavigateScreenState extends State<NavigateScreen> {
           ),
 
           // ── Destination label on map ────────────────────────────────────────
-          if (job != null && _hasJobCoords)
+          if (job != null && _hasValidDest)
             Positioned(
               top: 80,
               left: 16,
@@ -343,7 +381,7 @@ class _NavigateScreenState extends State<NavigateScreen> {
                             job != null
                                 ? 'KES ${job.budget.toStringAsFixed(0)}'
                                 : '—',
-                            'Earnings',
+                            'Budget',
                             green,
                             context,
                           ),
@@ -376,8 +414,8 @@ class _NavigateScreenState extends State<NavigateScreen> {
                         ),
                       const SizedBox(height: 14),
 
-                      // No-coords notice
-                      if (!_hasJobCoords && widget.job != null)
+                      // No-coords notice (only when geocoding also failed)
+                      if (!_hasValidDest && widget.job != null && !_routeLoading)
                         Container(
                           margin: const EdgeInsets.only(bottom: 10),
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -386,11 +424,11 @@ class _NavigateScreenState extends State<NavigateScreen> {
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
                           ),
-                          child: Row(
+                          child: const Row(
                             children: [
-                              const Icon(Icons.info_outline, color: Colors.orange, size: 16),
-                              const SizedBox(width: 8),
-                              const Expanded(
+                              Icon(Icons.info_outline, color: Colors.orange, size: 16),
+                              SizedBox(width: 8),
+                              Expanded(
                                 child: Text(
                                   'No GPS pin — tap Open in Maps to navigate by address.',
                                   style: TextStyle(color: Colors.orange, fontSize: 12),
@@ -411,7 +449,7 @@ class _NavigateScreenState extends State<NavigateScreen> {
                               onPressed: _openInMaps,
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: green,
-                                side: BorderSide(color: green),
+                                side: const BorderSide(color: green),
                                 padding: const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                               ),
@@ -424,7 +462,7 @@ class _NavigateScreenState extends State<NavigateScreen> {
                               label: const Text("Arrived",
                                   style: TextStyle(
                                       fontSize: 14, fontWeight: FontWeight.w700)),
-                              onPressed: () => Navigator.pop(context),
+                              onPressed: _onArrived,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: green,
                                 foregroundColor: Colors.white,

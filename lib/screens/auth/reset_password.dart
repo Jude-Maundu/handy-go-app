@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/validators.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({Key? key}) : super(key: key);
@@ -49,12 +50,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                     controller: _emailController,
                     decoration: const InputDecoration(labelText: 'Email'),
                     keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value == null || !value.contains('@')) {
-                        return 'Enter a valid email';
-                      }
-                      return null;
-                    },
+                    validator: Validators.email,
                   ),
                   const SizedBox(height: 24),
                   if (auth.errorMessage != null)

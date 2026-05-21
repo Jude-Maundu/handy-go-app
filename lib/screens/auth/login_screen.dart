@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import 'register_screen.dart';
 import 'reset_password.dart';
 import 'auth_widgets.dart';
+import '../../services/validators.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -105,8 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             prefixIcon: Icon(Icons.mail_outline,
                                 color: AC.textSec(context), size: 20),
                           ),
-                          validator: (v) =>
-                              (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
+                          validator: Validators.email,
                         ),
                         const SizedBox(height: 16),
 
@@ -132,8 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               onPressed: () => setState(() => _obscure = !_obscure),
                             ),
                           ),
-                          validator: (v) =>
-                              (v == null || v.length < 6) ? 'Min 6 characters' : null,
+                          validator: Validators.password,
                         ),
                         const SizedBox(height: 6),
 
