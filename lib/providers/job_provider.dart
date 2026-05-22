@@ -76,6 +76,24 @@ class JobProvider extends ChangeNotifier {
     return _col.doc(jobId).snapshots().map((doc) => doc.exists ? Job.fromFirestore(doc) : null);
   }
 
+  /// Real-time stream of all jobs belonging to this user (client or fundi).
+  Stream<List<Job>> streamMyJobs(String userId, {bool isClient = true}) {
+    final field = isClient ? 'clientId' : 'fundiId';
+    return _col.where(field, isEqualTo: userId).snapshots().map((s) {
+      final jobs = s.docs.map((d) => Job.fromFirestore(d)).toList();
+      jobs.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return jobs;
+    });
+  }
+
+  /// Persist the fundi's work-item checklist to the job document.
+  Future<void> saveWorkItems(
+      String jobId, List<Map<String, dynamic>> items) async {
+    try {
+      await _col.doc(jobId).update({'workItems': items});
+    } catch (_) {}
+  }
+
   /// Fundi accepts a pending job — uses a transaction to prevent double-accepts.
   Future<bool> acceptJob({
     required String jobId,
@@ -116,6 +134,28 @@ class JobProvider extends ChangeNotifier {
   Future<void> cancelJob(String jobId) async {
     try {
       await _col.doc(jobId).update({'status': 'cancelled'});
+    } catch (_) {}
+  }
+
+  /// Auto-cancel pending jobs older than [daysOld] days.
+  /// Safe to call on app startup — silently no-ops on error.
+  Future<void> cancelExpiredJobs({int daysOld = 3}) async {
+    try {
+      final cutoff = Timestamp.fromDate(
+          DateTime.now().subtract(Duration(days: daysOld)));
+      final snap = await _col
+          .where('status', isEqualTo: 'pending')
+          .where('createdAt', isLessThan: cutoff)
+          .get();
+      if (snap.docs.isEmpty) return;
+      final batch = _db.batch();
+      for (final doc in snap.docs) {
+        batch.update(doc.reference, {
+          'status': 'cancelled',
+          'cancelReason': 'Expired — no fundi accepted within $daysOld days',
+        });
+      }
+      await batch.commit();
     } catch (_) {}
   }
 

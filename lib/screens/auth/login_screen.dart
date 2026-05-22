@@ -8,6 +8,7 @@ import 'register_screen.dart';
 import 'reset_password.dart';
 import 'auth_widgets.dart';
 import '../../services/validators.dart';
+import 'google_sign_in_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -29,6 +30,19 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _googleSignIn() async {
+    final role = FlavorConfig.instance.isClient ? 'client' : 'fundi';
+    final authProv = context.read<AuthProvider>();
+    final ok = await authProv.signInWithGoogle(requiredRole: role);
+    if (!ok || !mounted) return;
+    final r = authProv.role;
+    if (r == 'admin') {
+      Navigator.pushReplacementNamed(context, '/admin');
+    } else {
+      Navigator.pushReplacementNamed(context, BuildConfig.homeRoute);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthProvider>();
@@ -38,9 +52,16 @@ class _LoginScreenState extends State<LoginScreen> {
       password: _passwordController.text.trim(),
       requiredRole: expectedRole,
     );
-    if (ok && mounted) {
-      final route = auth.role == 'admin' ? '/admin' : BuildConfig.homeRoute;
-      Navigator.pushReplacementNamed(context, route);
+    if (!ok || !mounted) return;
+
+    final role = auth.role;
+    if (role == 'admin') {
+      Navigator.pushReplacementNamed(context, '/admin');
+    } else if (role == null) {
+      // Profile couldn't be loaded from Firestore
+      auth.setError('Account profile not found. Contact support.');
+    } else {
+      Navigator.pushReplacementNamed(context, BuildConfig.homeRoute);
     }
   }
 
@@ -201,6 +222,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                         fontSize: 16,
                                         fontWeight: FontWeight.w700)),
                           ),
+                        ),
+                        const SizedBox(height: 16),
+                        const OrDivider(),
+                        const SizedBox(height: 16),
+
+                        GoogleSignInButton(
+                          onPressed: auth.isLoading ? null : _googleSignIn,
                         ),
                         const SizedBox(height: 20),
 

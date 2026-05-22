@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../../models/job_model.dart';
 import 'navigate_screen.dart';
 import 'payment_request_screen.dart';
+import '../sharedscreens/chat_screen.dart';
 
 class FundiJobDetailsScreen extends StatefulWidget {
   final String jobId;
@@ -107,6 +108,24 @@ class _JobDetailView extends StatelessWidget {
                   icon: const Icon(Icons.navigation),
                   label: const Text('Navigate to Client'),
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => NavigateScreen(job: job))),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  label: const Text('Chat with Client'),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChatScreen(
+                        jobId: job.id,
+                        jobTitle: job.title,
+                        otherPartyName: job.clientName ?? 'Client',
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),

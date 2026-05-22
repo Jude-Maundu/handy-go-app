@@ -15,16 +15,23 @@ class MpesaResult {
 class MpesaService {
   // ── OAuth ──────────────────────────────────────────────────────────────────
   static Future<String?> _getToken() async {
-    final creds = base64Encode(
-        utf8.encode('${DarajaConfig.consumerKey}:${DarajaConfig.consumerSecret}'));
-    final res = await http.get(
-      Uri.parse(
-          '${DarajaConfig.baseUrl}/oauth/v1/generate?grant_type=client_credentials'),
-      headers: {'Authorization': 'Basic $creds'},
-    );
-    if (res.statusCode == 200) {
-      return jsonDecode(res.body)['access_token'] as String?;
+    if (DarajaConfig.consumerKey.isEmpty || DarajaConfig.consumerSecret.isEmpty) {
+      return null;
     }
+    try {
+      final creds = base64Encode(
+          utf8.encode('${DarajaConfig.consumerKey}:${DarajaConfig.consumerSecret}'));
+      final res = await http
+          .get(
+            Uri.parse(
+                '${DarajaConfig.baseUrl}/oauth/v1/generate?grant_type=client_credentials'),
+            headers: {'Authorization': 'Basic $creds'},
+          )
+          .timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body)['access_token'] as String?;
+      }
+    } catch (_) {}
     return null;
   }
 
@@ -54,10 +61,15 @@ class MpesaService {
     required String jobId,
     required String description,
   }) async {
+    if (DarajaConfig.passkey.isEmpty) {
+      return const MpesaResult(
+          status: MpesaStatus.failed, message: 'M-Pesa not configured — check .env credentials');
+    }
     final token = await _getToken();
     if (token == null) {
       return const MpesaResult(
-          status: MpesaStatus.failed, message: 'Could not authenticate with M-Pesa');
+          status: MpesaStatus.failed,
+          message: 'M-Pesa authentication failed — check consumer key & secret');
     }
 
     final ts = _timestamp();
@@ -75,28 +87,33 @@ class MpesaService {
       'TransactionDesc': description,
     };
 
-    final res = await http.post(
-      Uri.parse('${DarajaConfig.baseUrl}/mpesa/stkpush/v1/processrequest'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(body),
-    );
+    try {
+      final res = await http
+          .post(
+            Uri.parse('${DarajaConfig.baseUrl}/mpesa/stkpush/v1/processrequest'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 20));
 
-    final data = jsonDecode(res.body) as Map<String, dynamic>;
-    if (res.statusCode == 200 && data['ResponseCode'] == '0') {
-      return MpesaResult(
-        status: MpesaStatus.pending,
-        checkoutRequestId: data['CheckoutRequestID'] as String?,
-        message: data['CustomerMessage'] as String?,
-      );
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode == 200 && data['ResponseCode'] == '0') {
+        return MpesaResult(
+          status: MpesaStatus.pending,
+          checkoutRequestId: data['CheckoutRequestID'] as String?,
+          message: data['CustomerMessage'] as String?,
+        );
+      }
+      final errMsg = data['errorMessage'] as String? ??
+          data['ResponseDescription'] as String? ??
+          'STK push failed (HTTP ${res.statusCode})';
+      return MpesaResult(status: MpesaStatus.failed, message: errMsg);
+    } catch (e) {
+      return MpesaResult(status: MpesaStatus.failed, message: 'Network error: $e');
     }
-    return MpesaResult(
-      status: MpesaStatus.failed,
-      message: (data['errorMessage'] ?? data['ResponseDescription'] ?? 'STK push failed')
-          as String,
-    );
   }
 
   // ── Single STK query (one attempt) ────────────────────────────────────────

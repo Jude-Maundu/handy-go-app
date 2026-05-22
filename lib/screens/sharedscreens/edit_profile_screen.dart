@@ -5,6 +5,7 @@ import '../../constants/app_colors.dart';
 import '../../config/flavor_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/validators.dart';
+import '../../services/toast_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -44,20 +45,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!mounted) return;
     setState(() => _saving = false);
     if (ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Profile updated'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating),
-      );
+      AppToast.show(context, 'Profile updated', isSuccess: true);
       Navigator.pop(context);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Failed to update profile. Try again.'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating),
-      );
+      AppToast.show(context, 'Failed to update profile. Try again.', isError: true);
     }
   }
 

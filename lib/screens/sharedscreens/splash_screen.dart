@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:handygo/providers/auth_provider.dart';
+import 'package:handygo/providers/job_provider.dart';
 import 'package:handygo/config/flavor_config.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -55,6 +56,9 @@ class _SplashScreenState extends State<SplashScreen> {
       // Navigate based on auth status, role, and flavor
       final config = FlavorConfig.instance;
       if (isLoggedIn) {
+        // Auto-cancel stale pending jobs on login
+        context.read<JobProvider>().cancelExpiredJobs();
+
         // Admin goes to admin screen regardless of flavor
         final route = authProvider.role == 'admin'
             ? '/admin'

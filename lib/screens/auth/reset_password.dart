@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/validators.dart';
+import '../../services/toast_service.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({Key? key}) : super(key: key);
@@ -26,9 +27,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     final success = await auth.resetPassword(_emailController.text.trim());
 
     if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password reset link sent.')),
-      );
+      AppToast.show(context, 'Password reset link sent.', isSuccess: true);
       Navigator.pop(context);
     }
   }

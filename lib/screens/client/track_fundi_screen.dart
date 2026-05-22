@@ -3,31 +3,37 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:handygo/providers/location_provider.dart';
 import 'package:handygo/providers/job_provider.dart';
+import 'package:handygo/models/job_model.dart';
 import 'package:handygo/widgets/live_map.dart';
 import 'package:handygo/widgets/fundi_marker.dart';
 
 class TrackFundiScreen extends StatelessWidget {
   final String jobId;
 
-  const TrackFundiScreen({Key? key, required this.jobId}) : super(key: key);
+  const TrackFundiScreen({super.key, required this.jobId});
 
   @override
   Widget build(BuildContext context) {
+    final jobs = context.read<JobProvider>();
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tracking Your Fundi'),
         backgroundColor: Colors.green,
       ),
-      body: Consumer2<LocationProvider, JobProvider>(
-        builder: (context, locationProvider, jobProvider, child) {
-          final job = jobProvider.getJob(jobId);
-
+      body: StreamBuilder<Job?>(
+        stream: jobs.streamJobById(jobId),
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: Colors.green));
+          }
+          final job = snap.data;
           if (job == null) {
             return const Center(child: Text('Job not found'));
           }
 
-          final fundiLatitude = job.fundiLatitude ?? job.latitude ?? 0.0;
-          final fundiLongitude = job.fundiLongitude ?? job.longitude ?? 0.0;
+          final fundiLat = job.fundiLatitude ?? job.latitude ?? 0.0;
+          final fundiLng = job.fundiLongitude ?? job.longitude ?? 0.0;
+          final locationProvider = context.watch<LocationProvider>();
 
           return Column(
             children: [
@@ -39,8 +45,8 @@ class TrackFundiScreen extends StatelessWidget {
                     FundiMarker(
                       id: job.fundiId ?? 'unknown',
                       name: job.fundiName ?? 'Fundi',
-                      latitude: fundiLatitude,
-                      longitude: fundiLongitude,
+                      latitude: fundiLat,
+                      longitude: fundiLng,
                       rating: job.fundiRating?.toStringAsFixed(1),
                     ),
                   ],
@@ -56,12 +62,8 @@ class TrackFundiScreen extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black12, blurRadius: 10),
-                    ],
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                    boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
                   ),
                   child: Column(
                     children: [
@@ -70,22 +72,13 @@ class TrackFundiScreen extends StatelessWidget {
                         children: [
                           Text(
                             'Fundi: ${job.fundiName ?? 'Fundi'}',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                           Row(
                             children: [
-                              const Icon(
-                                Icons.star,
-                                color: Colors.amber,
-                                size: 20,
-                              ),
+                              const Icon(Icons.star, color: Colors.amber, size: 20),
                               const SizedBox(width: 4),
-                              Text(
-                                job.fundiRating?.toStringAsFixed(1) ?? '0.0',
-                              ),
+                              Text(job.fundiRating?.toStringAsFixed(1) ?? '0.0'),
                             ],
                           ),
                         ],
@@ -111,10 +104,7 @@ class TrackFundiScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                       Text(
                         job.statusText,
-                        style: const TextStyle(
-                          color: Colors.green,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),

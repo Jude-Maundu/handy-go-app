@@ -5,6 +5,8 @@ import '../../config/flavor_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/job_provider.dart';
 import 'settings_screen.dart';
+import 'referral_screen.dart';
+import '../fundi/portfolio_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -110,6 +112,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _section(context, [
               _MenuTile(icon: Icons.notifications_outlined, label: 'Notifications', onTap: () => Navigator.pushNamed(context, '/notifications')),
               _MenuTile(icon: Icons.receipt_long_outlined, label: isClient ? 'Payment History' : 'Earnings', onTap: () => Navigator.pushNamed(context, isClient ? '/payments' : '/earnings')),
+              if (!isClient)
+                _MenuTile(
+                  icon: Icons.photo_library_outlined,
+                  label: 'My Portfolio',
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PortfolioScreen())),
+                ),
+              _MenuTile(
+                icon: Icons.card_giftcard_outlined,
+                label: 'Refer & Earn',
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReferralScreen())),
+              ),
               _MenuTile(icon: Icons.help_outline, label: 'Help & Support', onTap: () => Navigator.pushNamed(context, '/help')),
               _MenuTile(icon: Icons.privacy_tip_outlined, label: 'Privacy Policy', onTap: null),
             ]),

@@ -12,6 +12,7 @@ import 'job_searching_screen.dart';
 import '../../services/notification_service.dart';
 import '../../services/tomtom_service.dart';
 import '../../services/validators.dart';
+import '../../services/toast_service.dart';
 
 class RequestFundiScreen extends StatefulWidget {
   const RequestFundiScreen({super.key});
@@ -102,9 +103,7 @@ class _RequestFundiScreenState extends State<RequestFundiScreen> {
         photoUrls = await _uploadPhotos(jobId);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Photo upload failed: $e'), backgroundColor: Colors.orange),
-          );
+          AppToast.show(context, 'Photo upload failed: $e', isError: true);
         }
       }
     }
@@ -150,17 +149,13 @@ class _RequestFundiScreenState extends State<RequestFundiScreen> {
         Navigator.pop(context);
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(jobs.jobsError ?? 'Failed to post job.'), backgroundColor: Colors.red),
-      );
+      AppToast.show(context, jobs.jobsError ?? 'Failed to post job.', isError: true);
     }
   }
 
   void _showPhotoOptions() {
     if (_images.length >= 5) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Maximum 5 photos allowed')),
-      );
+      AppToast.show(context, 'Maximum 5 photos allowed', isError: true);
       return;
     }
     showModalBottomSheet(

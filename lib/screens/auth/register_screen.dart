@@ -5,6 +5,7 @@ import '../../config/flavor_config.dart';
 import '../../providers/auth_provider.dart';
 import 'auth_widgets.dart';
 import '../../services/validators.dart';
+import 'google_sign_in_button.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -19,7 +20,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _referralController = TextEditingController();
   bool _obscure = true;
+  bool _showReferral = false;
   final Set<String> _selectedSkills = {};
 
   static const _skillOptions = [
@@ -39,10 +42,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
+    _referralController.dispose();
     super.dispose();
   }
 
   bool get _isFundi => FlavorConfig.instance.isFundi;
+
+  Future<void> _googleSignIn() async {
+    final role = _isFundi ? 'fundi' : 'client';
+    final authProv = context.read<AuthProvider>();
+    final ok = await authProv.signInWithGoogle(requiredRole: role);
+    if (!ok || !mounted) return;
+    final homeRoute = FlavorConfig.instance.isClient ? '/client/home' : '/fundi/home';
+    Navigator.pushNamedAndRemoveUntil(context, homeRoute, (_) => false);
+  }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -65,6 +78,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       role: role,
       skills: skills,
       primarySkill: skills.isNotEmpty ? skills.first : null,
+      referredBy: _referralController.text.trim().isEmpty
+          ? null
+          : _referralController.text.trim().toUpperCase(),
     );
     if (ok && mounted) {
       final homeRoute =
@@ -281,6 +297,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                         ],
 
+                        // Referral code
+                        const SizedBox(height: 20),
+                        GestureDetector(
+                          onTap: () => setState(() => _showReferral = !_showReferral),
+                          child: Row(
+                            children: [
+                              Icon(Icons.card_giftcard_outlined,
+                                  size: 16, color: accent),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Have a referral code?',
+                                style: TextStyle(
+                                    color: accent,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                _showReferral
+                                    ? Icons.expand_less
+                                    : Icons.expand_more,
+                                size: 18,
+                                color: accent,
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_showReferral) ...[
+                          const SizedBox(height: 10),
+                          TextFormField(
+                            controller: _referralController,
+                            textCapitalization: TextCapitalization.characters,
+                            style: TextStyle(
+                                color: AC.text(context),
+                                letterSpacing: 2,
+                                fontWeight: FontWeight.w700),
+                            decoration: _dec('e.g. HGABC12345',
+                                Icons.confirmation_number_outlined),
+                          ),
+                        ],
+
                         // Error
                         if (auth.errorMessage != null) ...[
                           const SizedBox(height: 20),
@@ -332,6 +389,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         fontSize: 16,
                                         fontWeight: FontWeight.w700)),
                           ),
+                        ),
+                        const SizedBox(height: 16),
+                        const OrDivider(),
+                        const SizedBox(height: 16),
+
+                        GoogleSignInButton(
+                          onPressed: auth.isLoading ? null : _googleSignIn,
                         ),
                         const SizedBox(height: 20),
 

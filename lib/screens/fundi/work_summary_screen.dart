@@ -5,6 +5,7 @@ import '../../constants/app_colors.dart';
 import '../../config/flavor_config.dart';
 import '../../models/job_model.dart';
 import '../../providers/job_provider.dart';
+import '../../services/toast_service.dart';
 import 'payment_request_screen.dart';
 
 class WorkSummaryScreen extends StatefulWidget {
@@ -176,31 +177,49 @@ class _WorkSummaryScreenState extends State<WorkSummaryScreen> {
     );
   }
 
-  Future<void> _requestPayment() async {
+  List<Map<String, dynamic>> get _itemsAsMap => _items
+      .map((i) => {'name': i.name, 'amount': i.amount, 'category': i.category})
+      .toList();
+
+  Future<void> _markDone() async {
     if (_items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Add at least one item before requesting payment'),
-            behavior: SnackBarBehavior.floating),
-      );
+      AppToast.show(context, 'Add at least one item before marking done', isError: true);
       return;
     }
     setState(() => _updatingStatus = true);
-    await context.read<JobProvider>().updateJobStatus(
-          widget.job.id,
-          JobStatus.completed,
-          clientId: widget.job.clientId,
-          title: widget.job.title,
-        );
+    final jobs = context.read<JobProvider>();
+    await jobs.saveWorkItems(widget.job.id, _itemsAsMap);
+    await jobs.updateJobStatus(
+      widget.job.id,
+      JobStatus.completed,
+      clientId: widget.job.clientId,
+      title: widget.job.title,
+    );
+    if (!mounted) return;
+    setState(() => _updatingStatus = false);
+    AppToast.show(context, 'Job marked as done. Client has been notified.', isSuccess: true);
+  }
+
+  Future<void> _requestPayment() async {
+    if (_items.isEmpty) {
+      AppToast.show(context, 'Add at least one item before requesting payment', isError: true);
+      return;
+    }
+    setState(() => _updatingStatus = true);
+    final jobs = context.read<JobProvider>();
+    await jobs.saveWorkItems(widget.job.id, _itemsAsMap);
+    await jobs.updateJobStatus(
+      widget.job.id,
+      JobStatus.completed,
+      clientId: widget.job.clientId,
+      title: widget.job.title,
+    );
     if (!mounted) return;
     setState(() => _updatingStatus = false);
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => PaymentRequestScreen(
-          job: widget.job,
-          customAmount: _total,
-        ),
+        builder: (_) => PaymentRequestScreen(job: widget.job, customAmount: _total),
       ),
     );
   }
@@ -435,7 +454,7 @@ class _WorkSummaryScreenState extends State<WorkSummaryScreen> {
                         icon: const Icon(Icons.add, size: 18),
                         label: const Text('Add Item',
                             style: TextStyle(fontWeight: FontWeight.w600)),
-                        onPressed: _showAddItemSheet,
+                        onPressed: _updatingStatus ? null : _showAddItemSheet,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: accent,
                           side: BorderSide(color: accent),
@@ -445,21 +464,30 @@ class _WorkSummaryScreenState extends State<WorkSummaryScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Expanded(
-                      flex: 2,
-                      child: ElevatedButton.icon(
+                      child: OutlinedButton.icon(
                         icon: _updatingStatus
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.black))
-                            : const Icon(Icons.payment_outlined, size: 18),
-                        label: Text(
-                            _updatingStatus ? 'Updating…' : 'Request Payment',
-                            style: const TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w700)),
+                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.check_circle_outline, size: 18),
+                        label: const Text('Mark Done',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
+                        onPressed: _updatingStatus ? null : _markDone,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.green,
+                          side: const BorderSide(color: Colors.green),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.payment_outlined, size: 18),
+                        label: const Text('Pay',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                         onPressed: _updatingStatus ? null : _requestPayment,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: accent,

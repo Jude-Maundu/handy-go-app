@@ -16,15 +16,13 @@ class ClientBookingsScreen extends StatefulWidget {
 
 class _ClientBookingsScreenState extends State<ClientBookingsScreen> with SingleTickerProviderStateMixin {
   late TabController _tab;
+  String? _uid;
 
   @override
   void initState() {
     super.initState();
     _tab = TabController(length: 2, vsync: this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final uid = context.read<AuthProvider>().currentUserId;
-      if (uid != null) context.read<JobProvider>().fetchMyJobs(refresh: true, userId: uid);
-    });
+    _uid = context.read<AuthProvider>().currentUserId;
   }
 
   @override
@@ -51,20 +49,35 @@ class _ClientBookingsScreenState extends State<ClientBookingsScreen> with Single
           tabs: const [Tab(text: 'Active'), Tab(text: 'History')],
         ),
       ),
-      body: Consumer<JobProvider>(
-        builder: (context, jobs, _) {
-          if (jobs.isJobsLoading) return const Center(child: CircularProgressIndicator());
-          final active = jobs.myJobsList.where((j) => j.status != JobStatus.completed && j.status != JobStatus.cancelled).toList();
-          final history = jobs.myJobsList.where((j) => j.status == JobStatus.completed || j.status == JobStatus.cancelled).toList();
-          return TabBarView(
-            controller: _tab,
-            children: [
-              _BookingList(jobs: active, emptyMessage: 'No active bookings'),
-              _BookingList(jobs: history, emptyMessage: 'No past bookings'),
-            ],
-          );
-        },
-      ),
+      body: _uid == null
+          ? const Center(child: Text('Not logged in'))
+          : StreamBuilder<List<Job>>(
+              stream: context.read<JobProvider>().streamMyJobs(_uid!, isClient: true),
+              builder: (context, snap) {
+                if (snap.hasError) {
+                  return Center(
+                    child: Text(
+                      'Could not load bookings.\n${snap.error}',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AC.textSec(context), fontSize: 13),
+                    ),
+                  );
+                }
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final all = snap.data ?? [];
+                final active = all.where((j) => j.status != JobStatus.completed && j.status != JobStatus.cancelled).toList();
+                final history = all.where((j) => j.status == JobStatus.completed || j.status == JobStatus.cancelled).toList();
+                return TabBarView(
+                  controller: _tab,
+                  children: [
+                    _BookingList(jobs: active, emptyMessage: 'No active bookings'),
+                    _BookingList(jobs: history, emptyMessage: 'No past bookings'),
+                  ],
+                );
+              },
+            ),
     );
   }
 }
@@ -169,9 +182,78 @@ class _BookingCard extends StatelessWidget {
                 Text(job.fundiName!, style: TextStyle(color: AC.textSec(context), fontSize: 12)),
               ]),
             ],
+            if (job.status == JobStatus.completed || job.status == JobStatus.cancelled) ...[
+              const SizedBox(height: 12),
+              Divider(color: AC.div(context), height: 1),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  onTap: () => _repost(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.replay_outlined, size: 14, color: accent),
+                        const SizedBox(width: 6),
+                        Text('Post Again',
+                            style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _repost(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Post Again'),
+        content: Text('Repost "${job.title}" as a new job request?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Post')),
+        ],
+      ),
+    );
+    if (confirm != true || !context.mounted) return;
+
+    final auth = context.read<AuthProvider>();
+    final uid = auth.currentUserId;
+    final name = auth.userName;
+    if (uid == null) return;
+
+    final ok = await context.read<JobProvider>().createJob(
+      title: job.title,
+      category: job.category,
+      description: job.description,
+      budget: job.budget,
+      location: job.location,
+      clientId: uid,
+      clientName: name ?? 'Client',
+      clientPhone: auth.phone,
+      latitude: job.latitude,
+      longitude: job.longitude,
+    );
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? 'Job reposted successfully!' : 'Failed to repost'),
+          backgroundColor: ok ? Colors.green : Colors.red,
+        ),
+      );
+    }
   }
 }

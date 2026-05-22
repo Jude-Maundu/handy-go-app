@@ -6,6 +6,8 @@ import '../../providers/auth_provider.dart';
 import '../../services/notification_service.dart';
 import 'settings_screen.dart';
 import 'help_screen.dart';
+import 'referral_screen.dart';
+import '../fundi/portfolio_screen.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -138,6 +140,25 @@ class AppDrawer extends StatelessWidget {
               ),
             ],
 
+            if (!isClient)
+              _DrawerItem(
+                icon: Icons.photo_library_outlined,
+                label: 'My Portfolio',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const PortfolioScreen()));
+                },
+              ),
+            _DrawerItem(
+              icon: Icons.card_giftcard_outlined,
+              label: 'Refer & Earn',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const ReferralScreen()));
+              },
+            ),
             _DrawerItem(
               icon: Icons.settings_outlined,
               label: 'Settings',

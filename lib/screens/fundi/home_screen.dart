@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemNavigator;
+import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
@@ -254,15 +255,19 @@ class _FundiHomeTabState extends State<_FundiHomeTab> {
                   // Online/offline pill
                   GestureDetector(
                     onTap: () async {
-                      setState(() => _isOnline = !_isOnline);
-                      if (_isOnline) {
-                        final locProvider = context.read<LocationProvider>();
-                        final fundiProvider = context.read<FundiProvider>();
-                        final uid = context.read<AuthProvider>().currentUserId;
-                        await locProvider.getCurrentLocation();
-                        if (uid != null && locProvider.hasLocation) {
-                          fundiProvider.updateFundiLocation(
-                              uid, locProvider.latitude!, locProvider.longitude!);
+                      final newOnline = !_isOnline;
+                      setState(() => _isOnline = newOnline);
+                      final locProvider = context.read<LocationProvider>();
+                      final fundiProvider = context.read<FundiProvider>();
+                      final uid = context.read<AuthProvider>().currentUserId;
+                      if (uid != null) {
+                        fundiProvider.setOnlineStatus(uid, newOnline);
+                        if (newOnline) {
+                          await locProvider.getCurrentLocation();
+                          if (locProvider.hasLocation) {
+                            fundiProvider.updateFundiLocation(
+                                uid, locProvider.latitude!, locProvider.longitude!);
+                          }
                         }
                       }
                     },
@@ -358,15 +363,25 @@ class _FundiHomeTabState extends State<_FundiHomeTab> {
                 final job = jobs.first;
                 _startCountdown(job.id);
 
+                // Distance from fundi to job location
+                double distKm = 0;
+                if (location.latitude != null && location.longitude != null &&
+                    job.latitude != null && job.longitude != null) {
+                  distKm = Geolocator.distanceBetween(
+                        location.latitude!, location.longitude!,
+                        job.latitude!, job.longitude!) /
+                      1000;
+                }
+
                 return Positioned(
                   left: 0, right: 0, bottom: 0,
                   child: _JobRequestCard(
                     job: job,
                     secondsLeft: _secondsLeft,
                     color: color,
+                    distanceKm: distKm,
                     onAccept: () => _accept(job),
                     onSkip: () {
-                      // Decline: skip this job for now (timer reset handled by stream)
                       setState(() { _timerJobId = null; _secondsLeft = 0; });
                     },
                   ),
@@ -385,9 +400,10 @@ class _JobRequestCard extends StatelessWidget {
   final Job job;
   final int secondsLeft;
   final Color color;
+  final double distanceKm;
   final VoidCallback onAccept;
   final VoidCallback onSkip;
-  const _JobRequestCard({required this.job, required this.secondsLeft, required this.color, required this.onAccept, required this.onSkip});
+  const _JobRequestCard({required this.job, required this.secondsLeft, required this.color, required this.distanceKm, required this.onAccept, required this.onSkip});
 
   static const _icons = {
     'Plumbing': Icons.plumbing,
@@ -471,12 +487,18 @@ class _JobRequestCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              // Location + description
+              // Location + distance
               Row(
                 children: [
                   const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textSecondary),
                   const SizedBox(width: 4),
                   Expanded(child: Text(job.location, style: TextStyle(color: AC.textSec(context), fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  if (distanceKm > 0) ...[
+                    const SizedBox(width: 8),
+                    const Icon(Icons.near_me, size: 13, color: AppColors.textSecondary),
+                    const SizedBox(width: 3),
+                    Text('${distanceKm.toStringAsFixed(1)} km', style: TextStyle(color: AC.textSec(context), fontSize: 12, fontWeight: FontWeight.w600)),
+                  ],
                 ],
               ),
               const SizedBox(height: 4),

@@ -114,6 +114,16 @@ class FundiProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Persist fundi's online/offline status to Firestore so clients can see it.
+  Future<void> setOnlineStatus(String fundiId, bool isOnline) async {
+    try {
+      await _db.collection('users').doc(fundiId).update({
+        'isOnline': isOnline,
+        'lastSeen': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
+  }
+
   double _haversine(double lat1, double lng1, double lat2, double lng2) {
     const r = 6371.0;
     final dLat = (lat2 - lat1) * pi / 180;

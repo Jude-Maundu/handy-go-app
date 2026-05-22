@@ -34,6 +34,7 @@ class Job {
   final List<String> photoUrls;
   final String paymentStatus; // 'none' | 'pending' | 'paid' | 'failed'
   final String? clientPhone;
+  final List<Map<String, dynamic>> workItems;
 
   Job({
     required this.id,
@@ -66,6 +67,7 @@ class Job {
     this.photoUrls = const [],
     this.paymentStatus = 'none',
     this.clientPhone,
+    this.workItems = const [],
   });
 
   bool get isClientJob => BuildConfig.isClient && clientId != null;
@@ -138,6 +140,10 @@ class Job {
       photoUrls: (json['photoUrls'] as List<dynamic>?)?.cast<String>() ?? [],
       paymentStatus: json['paymentStatus'] as String? ?? 'none',
       clientPhone: json['clientPhone'] as String?,
+      workItems: (json['workItems'] as List<dynamic>?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          [],
     );
   }
 
@@ -188,6 +194,10 @@ class Job {
       photoUrls: (d['photoUrls'] as List<dynamic>?)?.cast<String>() ?? [],
       paymentStatus: d['paymentStatus'] as String? ?? 'none',
       clientPhone: d['clientPhone'] as String?,
+      workItems: (d['workItems'] as List<dynamic>?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          [],
     );
   }
 
@@ -222,6 +232,7 @@ class Job {
     List<String>? photoUrls,
     String? paymentStatus,
     String? clientPhone,
+    List<Map<String, dynamic>>? workItems,
   }) {
     return Job(
       id: id ?? this.id,
@@ -254,6 +265,7 @@ class Job {
       photoUrls: photoUrls ?? this.photoUrls,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       clientPhone: clientPhone ?? this.clientPhone,
+      workItems: workItems ?? this.workItems,
     );
   }
 
@@ -289,6 +301,7 @@ class Job {
       'photoUrls': photoUrls,
       'paymentStatus': paymentStatus,
       'clientPhone': clientPhone,
+      'workItems': workItems,
     };
   }
 }

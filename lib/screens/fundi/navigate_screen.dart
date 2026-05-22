@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -7,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../config/map_config.dart';
 import '../../constants/app_colors.dart';
 import '../../models/job_model.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../services/tomtom_service.dart';
 import 'work_summary_screen.dart';
@@ -26,6 +29,7 @@ class _NavigateScreenState extends State<NavigateScreen> {
   List<LatLng> _routePoints = [];
   bool _routeLoading = false;
   LatLng? _geocodedDest; // fallback when job has no coordinates
+  Timer? _locationTimer;
 
   // True when job has actual lat/lng fields
   bool get _hasJobCoords =>
@@ -65,6 +69,19 @@ class _NavigateScreenState extends State<NavigateScreen> {
       }
       loc.addListener(_onLocationUpdate);
       loc.startTracking();
+
+      // Broadcast fundi location to Firestore every 10 s so client can track
+      final job = widget.job;
+      final fundiId = context.read<AuthProvider>().currentUserId;
+      if (job != null && fundiId != null) {
+        _locationTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+          if (_myPos == null) return;
+          FirebaseFirestore.instance.collection('jobs').doc(job.id).update({
+            'fundiLatitude': _myPos!.latitude,
+            'fundiLongitude': _myPos!.longitude,
+          }).catchError((_) {});
+        });
+      }
     });
   }
 
@@ -96,7 +113,7 @@ class _NavigateScreenState extends State<NavigateScreen> {
     final pos = LatLng(loc.latitude!, loc.longitude!);
     setState(() => _myPos = pos);
     if (_following) {
-      _safeMoveMap(pos, null);
+      _safeMoveMap(pos, 18);
     }
   }
 
@@ -108,7 +125,7 @@ class _NavigateScreenState extends State<NavigateScreen> {
 
   void _recenter() {
     setState(() => _following = true);
-    if (_myPos != null) _safeMoveMap(_myPos!, 16);
+    if (_myPos != null) _safeMoveMap(_myPos!, 18);
   }
 
   Future<void> _openInMaps() async {
@@ -143,6 +160,7 @@ class _NavigateScreenState extends State<NavigateScreen> {
 
   @override
   void dispose() {
+    _locationTimer?.cancel();
     context.read<LocationProvider>()
       ..removeListener(_onLocationUpdate)
       ..stopTracking();
@@ -168,7 +186,7 @@ class _NavigateScreenState extends State<NavigateScreen> {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: mapCenter,
-              initialZoom: 16,
+              initialZoom: 18,
               onMapEvent: (event) {
                 if (event is MapEventMoveStart &&
                     event.source == MapEventSource.dragStart) {

@@ -7,6 +7,7 @@ import '../../config/flavor_config.dart';
 import '../../models/job_model.dart';
 import '../../providers/job_provider.dart';
 import '../../services/mpesa_service.dart';
+import '../../services/toast_service.dart';
 
 class PaymentRequestScreen extends StatefulWidget {
   final Job job;
@@ -59,21 +60,11 @@ class _PaymentRequestScreenState extends State<PaymentRequestScreen> {
     final amount = int.tryParse(_amountController.text.trim()) ?? 0;
 
     if (phone.length != 12 || !phone.startsWith('254')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter a valid Kenyan number e.g. 0712 345 678'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppToast.show(context, 'Enter a valid Kenyan number e.g. 0712 345 678', isError: true);
       return;
     }
     if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter a valid amount'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      AppToast.show(context, 'Enter a valid amount', isError: true);
       return;
     }
 
